@@ -1,57 +1,54 @@
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 import time
+import csv
 
+# 브라우저 생성
+browser = webdriver.Chrome('C:/chromedriver.exe')
 
-def chrome_driver():
-    options = webdriver.ChromeOptions()
-    options.add_argument("headless")  # 웹 브라우저를 시각적으로 띄우지 않는 headless chrome 옵션
-    options.add_experimental_option('detach', True)
-    options.add_experimental_option("excludeSwitches", ["enable-logging"])  # 개발도구 로그 숨기기
-    user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'
-    options.add_argument(f'user-agent={user_agent}')
-    options.add_argument("start-maximized")  # 창 크기 최대로
-    options.add_argument("disable-infobars")
-    options.add_argument("--disable-extensions")
-    driver = webdriver.Chrome('./chromedriver.exe', options=options)
-    return driver
+#웹사이트 열기
+browser.get('https://www.naver.com/')
+browser.implicitly_wait(3)
 
+# 쇼핑 메뉴 클릭
+browser.find_element(By.CSS_SELECTOR, "#NM_FAVORITE > div.group_nav > ul.list_nav.type_fix > li:nth-child(5) > a").click()
+browser.implicitly_wait(3)
 
-def shopping_category():
-    driver = chrome_driver()
-    keywords = ['샷시', '샤시', '창호']
-    for keyword in keywords:
-        url = f'https://search.shopping.naver.com/search/all?query={keyword}&frm=NVSHATC'
-        driver.get(url)
-        time.sleep(1.5)
+# 검색창 클릭
+search = browser.find_element(By.CSS_SELECTOR,'#__next > div > div.header_header__24NVj > div > div > div._gnb_header_area_150KE > div > div._gnbLogo_gnb_logo_3eIAf > div > div._gnbSearch_gnb_search_3O1L2 > form > fieldset > div._gnbSearch_inner_2Zksb > div > input')
+search.click()
 
-        ul_tag = driver.find_element(By.CLASS_NAME, 'list_basis')
-        lis = ul_tag.find_elements(By.CSS_SELECTOR, 'div > div > li')
-        # print(f'상품수: {len(lis)}개')
+# 검색어 입력
+search.send_keys('쇼파'); search.send_keys(Keys.ENTER)  # 쇼파를 검색하고 엔터까지
 
-        print(f'keyword: {keyword}')
-        for li in lis:
-            try:
-                title = li.find_element(By.CLASS_NAME, 'basicList_title__3P9Q7').text.strip()
-                if len(li.find_elements(By.CLASS_NAME, 'ad_ad_stk__12U34')):
-                    title = '[AD] ' + title  # 광고노출상품
-                print(title)
+# 스크롤 전 높이
+before_h = browser.execute_script('return window.scrollY')
 
-                category = ''
-                category_div = li.find_element(By.CLASS_NAME, 'basicList_depth__2QIie').find_elements(By.TAG_NAME,
-                                                                                                      'span')
-                for categ in category_div:
-                    # print(categ.text)
-                    category += categ.text.strip() + '>'
+# 무한 스크롤 하기 (맨 아래로 스크롤 내리기)
+while True:
+    browser.find_element(By.CSS_SELECTOR,'body').send_keys(Keys.END)
+    time.sleep(1)   # 스크롤 할 때 부하가 걸리지 않도록
+    after_h = browser.execute_script('return window.scrollY')
+    if after_h == before_h:
+        break   # 더이상 스크롤이 안되면(변화가 없으면) break
+    before_h = after_h
+print('Scroll End'); print()
 
-                category = category[:-1]
-                print(f'카테고리: {category}\n')
-            except:
-                continue
+# 파일 생성
+f = open('C:\Ghost\네이버쇼핑몰크롤링_ver1.csv', 'w', encoding='cp949', newline='')
+csvWriter = csv.writer(f)
 
-        print('=' * 50)
+# 상품 정보 div
+items = browser.find_elements(By.CSS_SELECTOR,'.basicList_info_area__TWvzp')
+print(items)
 
-    driver.close()
+for item in items:
+    name = item.find_element(By.CSS_SELECTOR,'.basicList_title__VfX3c').text
+    price = item.find_element(By.CSS_SELECTOR,'.price_num__S2p_v').text
+    link = item.find_element(By.CSS_SELECTOR,'.basicList_title__VfX3c > a').get_attribute('href')
+    print(name, price, link)
+    csvWriter.writerow([name, price, link])
 
-
-shopping_category()
+#파일 닫기
+f.close()
